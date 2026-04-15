@@ -1,0 +1,8 @@
+streamlit==1.35.0
+yfinance==0.2.40
+pandas==2.2.2
+numpy==1.26.4
+anthropic==0.29.0
+python-dotenv==1.0.1
+cachetools==5.3.3
+plotly==5.22.0
