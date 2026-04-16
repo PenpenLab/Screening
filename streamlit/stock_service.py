@@ -82,7 +82,6 @@ def search_stocks(query: str, market: str) -> list[dict]:
 def build_metrics(symbol: str, market: str, info: dict) -> dict:
     currency = "JPY" if market == "JP" else (info.get("currency") or "USD")
 
-    # 自己資本比率
     equity_ratio = None
     total_assets = _safe_float(info.get("totalAssets"))
     book_value = _safe_float(info.get("bookValue"))
@@ -103,34 +102,27 @@ def build_metrics(symbol: str, market: str, info: dict) -> dict:
         "change_pct": _safe_float(info.get("regularMarketChangePercent")),
         "market_cap": _safe_float(info.get("marketCap")),
         "volume": _safe_int(info.get("regularMarketVolume")),
-        # Valuation
         "per": _safe_float(info.get("trailingPE")),
         "pbr": _safe_float(info.get("priceToBook")),
         "psr": _safe_float(info.get("priceToSalesTrailing12Months")),
         "ev_ebitda": _safe_float(info.get("enterpriseToEbitda")),
         "peg_ratio": _safe_float(info.get("pegRatio")),
-        # Profitability
         "roe": pct("returnOnEquity"),
         "roa": pct("returnOnAssets"),
         "operating_margin": pct("operatingMargins"),
         "net_margin": pct("profitMargins"),
-        # Growth
         "revenue_growth": pct("revenueGrowth"),
         "earnings_growth": pct("earningsGrowth"),
         "eps_growth": pct("earningsQuarterlyGrowth"),
-        # Health
         "equity_ratio": equity_ratio,
         "debt_to_equity": _safe_float(info.get("debtToEquity")),
         "current_ratio": _safe_float(info.get("currentRatio")),
-        # Returns
         "dividend_yield": pct("dividendYield"),
         "payout_ratio": pct("payoutRatio"),
-        # Misc
         "eps": _safe_float(info.get("trailingEps")),
         "bps": _safe_float(info.get("bookValue")),
         "sector": info.get("sector"),
         "industry": info.get("industry"),
-        # Detail
         "description": info.get("longBusinessSummary"),
         "website": info.get("website"),
         "employees": _safe_int(info.get("fullTimeEmployees")),

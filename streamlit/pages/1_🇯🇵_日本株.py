@@ -1,17 +1,11 @@
 """
 日本株スクリーニングページ
 """
-import sys
-import os
-# Streamlit Cloud はリポジトリルートを作業ディレクトリにするため
-# streamlit/ ディレクトリを明示的にパスに追加する
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 import streamlit as st
 import pandas as pd
 
-from services.screening_service import screen_stocks
-from services.ui_components import render_screening_table, render_stock_detail
+from screening_service import screen_stocks
+from ui_components import render_screening_table, render_stock_detail
 
 st.set_page_config(page_title="日本株スクリーニング", page_icon="🇯🇵", layout="wide")
 
@@ -39,7 +33,7 @@ with st.sidebar:
 
     st.subheader("財務健全性")
     equity_ratio_min = st.number_input("自己資本比率 最低 (%)", min_value=0.0, value=0.0, step=5.0,
-                                        help="日本株特有の指標。40%以上が安全圏の目安")
+                                        help="40%以上が安全圏の目安")
 
     st.subheader("成長性")
     rev_growth_min = st.number_input("売上高成長率 最低 (%)", value=0.0, step=1.0)
@@ -90,15 +84,12 @@ if run_btn:
         progress_bar=progress,
     )
     progress.empty()
-
     st.session_state["jp_results"] = df
 
 if "jp_results" in st.session_state and not st.session_state["jp_results"].empty:
     df = st.session_state["jp_results"]
     st.success(f"**{len(df)} 銘柄** が条件に合致しました")
-
     selected = render_screening_table(df, "JP")
-
     if selected:
         st.markdown("---")
         render_stock_detail(selected, "JP")
@@ -107,7 +98,6 @@ elif "jp_results" in st.session_state:
     st.warning("条件に合致する銘柄が見つかりませんでした。条件を緩めてお試しください。")
 else:
     st.info("👈 左のサイドバーで条件を設定して「スクリーニング実行」を押してください。\n\n条件を空のまま実行すると全銘柄を時価総額順で表示します。")
-
     with st.expander("💡 日本株スクリーニングのヒント"):
         st.markdown("""
         | 戦略 | 推奨設定 |

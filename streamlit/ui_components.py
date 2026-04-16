@@ -3,17 +3,13 @@
 """
 from __future__ import annotations
 
-import sys
-import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 import json
 import plotly.graph_objects as go
 import streamlit as st
 import pandas as pd
 
-from services.stock_service import fetch_info, fetch_history, build_metrics
-from services.ai_service import analyze_stock
+from stock_service import fetch_info, fetch_history, build_metrics
+from ai_service import analyze_stock
 
 
 # ── フォーマット ───────────────────────────────────────────────────────────
@@ -112,7 +108,6 @@ def render_stock_detail(symbol: str, market: str):
     currency = m["currency"]
     price_sym = "¥" if currency == "JPY" else "$"
 
-    # ── ヘッダー ──
     st.subheader(f"{m['name']}  `{symbol}`")
     col_p, col_chg, col_cap, col_52 = st.columns(4)
     col_p.metric("株価", fmt_price(m["price"], currency),
@@ -122,10 +117,8 @@ def render_stock_detail(symbol: str, market: str):
     col_cap.metric("52週 高値", fmt_price(m["week52_high"], currency))
     col_52.metric("52週 安値", fmt_price(m["week52_low"], currency))
 
-    # ── チャート ──
     render_price_chart(symbol, market, currency)
 
-    # ── 指標グリッド ──
     st.markdown("---")
     tab_val, tab_prof, tab_health = st.tabs(["📊 バリュエーション", "📈 収益性・成長性", "🏦 財務・株主還元"])
 
@@ -158,7 +151,6 @@ def render_stock_detail(symbol: str, market: str):
                   f"{price_sym}{m['target_price']:.0f}" if m["target_price"] else "—")
         c3.metric("推奨", m.get("recommendation") or "—")
 
-    # ── 会社概要 ──
     if m.get("description"):
         with st.expander("会社概要"):
             st.write(m["description"][:800])
@@ -170,13 +162,12 @@ def render_stock_detail(symbol: str, market: str):
             if m.get("website"):
                 cols[2].markdown(f"[🔗 公式サイト]({m['website']})")
 
-    # ── AI 分析 ──
     st.markdown("---")
     st.subheader("🤖 Claude AI 分析")
 
     has_key = bool(st.secrets.get("ANTHROPIC_API_KEY", ""))
     if not has_key:
-        st.info("AI分析を使用するには `.streamlit/secrets.toml` に `ANTHROPIC_API_KEY` を設定してください。")
+        st.info("AI分析を使用するには Streamlit Cloud の Secrets に `ANTHROPIC_API_KEY` を設定してください。")
         return
 
     if st.button("AI 分析を実行", key=f"ai_{symbol}", type="primary"):
@@ -190,10 +181,10 @@ def render_stock_detail(symbol: str, market: str):
 
 def _render_ai_result(result: dict):
     verdict = result.get("verdict", "neutral")
-    colors = {"bullish": "🟢", "neutral": "🟡", "bearish": "🔴"}
+    icons = {"bullish": "🟢", "neutral": "🟡", "bearish": "🔴"}
     labels = {"bullish": "強気 (Bullish)", "neutral": "中立 (Neutral)", "bearish": "弱気 (Bearish)"}
 
-    st.markdown(f"### {colors.get(verdict, '🟡')} {labels.get(verdict, verdict)}")
+    st.markdown(f"### {icons.get(verdict, '🟡')} {labels.get(verdict, verdict)}")
     st.caption(result.get("verdict_reason", ""))
     st.write(result.get("summary", ""))
 
@@ -230,12 +221,10 @@ US_DISPLAY_COLS = {
 
 
 def render_screening_table(df: pd.DataFrame, market: str) -> str | None:
-    """テーブルを描画し、選択された銘柄コードを返す"""
     col_map = JP_DISPLAY_COLS if market == "JP" else US_DISPLAY_COLS
     available = [c for c in col_map if c in df.columns]
     display_df = df[available].copy().rename(columns=col_map)
 
-    # 数値フォーマット
     for col in ["PER", "PBR", "P/E", "P/B"]:
         if col in display_df.columns:
             display_df[col] = display_df[col].apply(lambda v: f"{v:.1f}x" if pd.notna(v) else "—")
@@ -246,7 +235,6 @@ def render_screening_table(df: pd.DataFrame, market: str) -> str | None:
 
     st.dataframe(display_df, use_container_width=True, hide_index=True)
 
-    # 銘柄選択
     symbols = df["symbol"].tolist()
     selected = st.selectbox("詳細を表示する銘柄を選択", ["— 選択してください —"] + symbols,
                             key=f"select_{market}")

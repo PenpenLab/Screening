@@ -1,17 +1,11 @@
 """
 米国株スクリーニングページ
 """
-import sys
-import os
-# Streamlit Cloud はリポジトリルートを作業ディレクトリにするため
-# streamlit/ ディレクトリを明示的にパスに追加する
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 import streamlit as st
 import pandas as pd
 
-from services.screening_service import screen_stocks
-from services.ui_components import render_screening_table, render_stock_detail
+from screening_service import screen_stocks
+from ui_components import render_screening_table, render_stock_detail
 
 st.set_page_config(page_title="米国株スクリーニング", page_icon="🇺🇸", layout="wide")
 
@@ -38,7 +32,7 @@ with st.sidebar:
 
     st.subheader("財務健全性")
     de_max = st.number_input("D/E Ratio 最大", min_value=0.0, value=0.0, step=0.5, format="%.1f",
-                              help="負債対資本比率。0 = 上限なし")
+                              help="0 = 上限なし")
 
     st.subheader("成長性")
     rev_growth_min = st.number_input("売上高成長率 最低 (%)", value=0.0, step=1.0)
@@ -90,15 +84,12 @@ if run_btn:
         progress_bar=progress,
     )
     progress.empty()
-
     st.session_state["us_results"] = df
 
 if "us_results" in st.session_state and not st.session_state["us_results"].empty:
     df = st.session_state["us_results"]
     st.success(f"**{len(df)} 銘柄** が条件に合致しました")
-
     selected = render_screening_table(df, "US")
-
     if selected:
         st.markdown("---")
         render_stock_detail(selected, "US")
@@ -107,7 +98,6 @@ elif "us_results" in st.session_state:
     st.warning("条件に合致する銘柄が見つかりませんでした。条件を緩めてお試しください。")
 else:
     st.info("👈 左のサイドバーで条件を設定して「スクリーニング実行」を押してください。\n\n条件を空のまま実行すると全銘柄を時価総額順で表示します。")
-
     with st.expander("💡 米国株スクリーニングのヒント"):
         st.markdown("""
         | 戦略 | 推奨設定 |

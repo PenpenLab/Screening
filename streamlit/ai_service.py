@@ -80,9 +80,6 @@ D/Eレシオ: {fmt(m.get('debt_to_equity'), '', 2)}
 
 @st.cache_data(ttl=86400, show_spinner=False)
 def analyze_stock(symbol: str, market: str, metrics_json: str) -> dict:
-    """
-    metrics_json: JSON文字列 (cache keyとして使用)
-    """
     api_key = st.secrets.get("ANTHROPIC_API_KEY", "")
     if not api_key:
         raise ValueError("ANTHROPIC_API_KEY が設定されていません")

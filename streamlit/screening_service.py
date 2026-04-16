@@ -3,15 +3,11 @@
 """
 from __future__ import annotations
 
-import sys
-import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 from typing import Optional
 import pandas as pd
 import streamlit as st
 
-from services.stock_service import fetch_info, build_metrics
+from stock_service import fetch_info, build_metrics
 
 # ── ユニバース ─────────────────────────────────────────────────────────────
 
@@ -71,7 +67,6 @@ def _passes(m: dict, filters: dict) -> bool:
     if not all(checks):
         return False
 
-    # 時価総額 (十億単位で比較)
     cap = m.get("market_cap")
     cap_min = filters.get("market_cap_min")
     cap_max = filters.get("market_cap_max")
@@ -114,7 +109,6 @@ def screen_stocks(
         return pd.DataFrame()
 
     df = pd.DataFrame(results)
-
     if sort_by in df.columns:
         df = df.sort_values(sort_by, ascending=not sort_desc, na_position="last")
 
