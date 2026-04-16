@@ -225,6 +225,23 @@ def render_screening_table(df: pd.DataFrame, market: str) -> str | None:
     available = [c for c in col_map if c in df.columns]
     display_df = df[available].copy().rename(columns=col_map)
 
+    currencies = df["currency"].tolist() if "currency" in df.columns else None
+
+    # 株価・時価総額: 通貨記号付きフォーマット
+    for disp_col, raw_col, fmt_fn in [
+        ("株価", "price", fmt_price), ("Price", "price", fmt_price),
+        ("時価総額", "market_cap", fmt_cap), ("Mkt Cap", "market_cap", fmt_cap),
+    ]:
+        if disp_col in display_df.columns and raw_col in df.columns and currencies:
+            display_df[disp_col] = [fmt_fn(v, c) for v, c in zip(df[raw_col], currencies)]
+
+    # 前日比: +/- 符号付き %
+    for col in ["前日比%", "Chg%"]:
+        if col in display_df.columns:
+            display_df[col] = display_df[col].apply(
+                lambda v: f"{v:+.2f}%" if pd.notna(v) else "—"
+            )
+
     for col in ["PER", "PBR", "P/E", "P/B"]:
         if col in display_df.columns:
             display_df[col] = display_df[col].apply(lambda v: f"{v:.1f}x" if pd.notna(v) else "—")
