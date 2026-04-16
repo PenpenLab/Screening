@@ -76,7 +76,7 @@ if run_btn:
     if cap_max > 0: filters["market_cap_max"] = cap_max
 
     progress = st.progress(0, text="データ取得中...")
-    df: pd.DataFrame = screen_stocks(
+    df, errs = screen_stocks(
         "US", filters,
         sort_by=sort_options[sort_label],
         sort_desc=sort_desc,
@@ -85,17 +85,28 @@ if run_btn:
     )
     progress.empty()
     st.session_state["us_results"] = df
+    st.session_state["us_errors"] = errs
 
 if "us_results" in st.session_state and not st.session_state["us_results"].empty:
     df = st.session_state["us_results"]
+    errs = st.session_state.get("us_errors", [])
     st.success(f"**{len(df)} 銘柄** が条件に合致しました")
+    if errs:
+        with st.expander(f"⚠️ {len(errs)} 銘柄のデータ取得に失敗 (クリックで詳細)"):
+            st.code("\n".join(errs[:20]))
     selected = render_screening_table(df, "US")
     if selected:
         st.markdown("---")
         render_stock_detail(selected, "US")
 
 elif "us_results" in st.session_state:
-    st.warning("条件に合致する銘柄が見つかりませんでした。条件を緩めてお試しください。")
+    errs = st.session_state.get("us_errors", [])
+    if errs:
+        st.error(f"データ取得に失敗しました ({len(errs)} 件)。ネットワークまたは yfinance の問題の可能性があります。")
+        with st.expander("エラー詳細"):
+            st.code("\n".join(errs[:20]))
+    else:
+        st.warning("条件に合致する銘柄が見つかりませんでした。条件を緩めてお試しください。")
 else:
     st.info("👈 左のサイドバーで条件を設定して「スクリーニング実行」を押してください。\n\n条件を空のまま実行すると全銘柄を時価総額順で表示します。")
     with st.expander("💡 米国株スクリーニングのヒント"):

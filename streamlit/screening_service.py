@@ -89,9 +89,14 @@ def screen_stocks(
     sort_desc: bool = True,
     limit: int = 50,
     progress_bar=None,
-) -> pd.DataFrame:
+) -> tuple[pd.DataFrame, list[str]]:
+    """
+    Returns (DataFrame, error_list).
+    error_list is non-empty when some symbols failed to fetch.
+    """
     universe = JP_UNIVERSE if market == "JP" else US_UNIVERSE
     results = []
+    errors: list[str] = []
     total = len(universe)
 
     for i, symbol in enumerate(universe):
@@ -102,14 +107,15 @@ def screen_stocks(
             m = build_metrics(symbol, market, info)
             if _passes(m, filters):
                 results.append(m)
-        except Exception:
+        except Exception as e:
+            errors.append(f"{symbol}: {e}")
             continue
 
     if not results:
-        return pd.DataFrame()
+        return pd.DataFrame(), errors
 
     df = pd.DataFrame(results)
     if sort_by in df.columns:
         df = df.sort_values(sort_by, ascending=not sort_desc, na_position="last")
 
-    return df.head(limit).reset_index(drop=True)
+    return df.head(limit).reset_index(drop=True), errors

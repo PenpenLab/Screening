@@ -1,6 +1,6 @@
 """
 株価・財務データ取得サービス (同期版 / Streamlit用)
-@st.cache_data でキャッシュ (TTL 15分)
+cachetools.TTLCache でキャッシュ (TTL 15分)
 """
 from __future__ import annotations
 
@@ -8,6 +8,10 @@ from typing import Optional
 import pandas as pd
 import yfinance as yf
 import streamlit as st
+from cachetools import TTLCache
+
+_info_cache: TTLCache = TTLCache(maxsize=500, ttl=900)
+_hist_cache: TTLCache = TTLCache(maxsize=200, ttl=900)
 
 
 # ── ヘルパー ──────────────────────────────────────────────────────────────
@@ -38,11 +42,18 @@ def _safe_int(val) -> Optional[int]:
 
 # ── データ取得 ─────────────────────────────────────────────────────────────
 
-@st.cache_data(ttl=900, show_spinner=False)
 def fetch_info(symbol: str, market: str) -> dict:
+    key = f"{market}:{symbol}"
+    if key in _info_cache:
+        return _info_cache[key]
     yf_symbol = _to_jp_symbol(symbol) if market == "JP" else symbol
     ticker = yf.Ticker(yf_symbol)
-    return ticker.info
+    info = ticker.info
+    # 空dictや不正なレスポンスを弾く
+    if not info or not isinstance(info, dict) or len(info) < 3:
+        raise ValueError(f"yfinance から有効なデータを取得できませんでした: {yf_symbol}")
+    _info_cache[key] = info
+    return info
 
 
 @st.cache_data(ttl=900, show_spinner=False)
