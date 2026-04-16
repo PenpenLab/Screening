@@ -8,7 +8,7 @@ from typing import Optional
 import pandas as pd
 import streamlit as st
 
-from stock_service import fetch_info, build_metrics
+from stock_service import fetch_info, build_metrics, _info_cache
 
 # ── ユニバース ─────────────────────────────────────────────────────────────
 
@@ -103,6 +103,8 @@ def screen_stocks(
     for i, symbol in enumerate(universe):
         if progress_bar is not None:
             progress_bar.progress((i + 1) / total, text=f"{symbol} を取得中... ({i+1}/{total})")
+        cache_key = f"{market}:{symbol}"
+        is_cached = cache_key in _info_cache
         for attempt in range(3):
             try:
                 info = fetch_info(symbol, market)
@@ -118,8 +120,9 @@ def screen_stocks(
                     continue
                 errors.append(f"{symbol}: {e}")
                 break
-        # Polite delay between tickers to avoid Yahoo Finance rate limits
-        time.sleep(0.5)
+        # キャッシュミス（実際にネットワーク通信した）場合のみ待機
+        if not is_cached:
+            time.sleep(0.2)
 
     if not results:
         return pd.DataFrame(), errors
