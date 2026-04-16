@@ -111,7 +111,7 @@ def render_stock_detail(symbol: str, market: str):
     st.subheader(f"{m['name']}  `{symbol}`")
     col_p, col_chg, col_cap, col_52 = st.columns(4)
     col_p.metric("株価", fmt_price(m["price"], currency),
-                 f"{m['change_pct']:+.2f}%" if m["change_pct"] else None,
+                 f"{m['change_pct']:+.2f}%" if m["change_pct"] is not None else None,
                  delta_color=delta_color(m["change_pct"]))
     col_chg.metric("時価総額", fmt_cap(m["market_cap"], currency))
     col_cap.metric("52週 高値", fmt_price(m["week52_high"], currency))
@@ -129,7 +129,7 @@ def render_stock_detail(symbol: str, market: str):
         c3.metric("EV/EBITDA", fmt_num(m["ev_ebitda"], 1, "x"))
         c1.metric("PSR", fmt_num(m["psr"], 2, "x"))
         c2.metric("PEGレシオ", fmt_num(m["peg_ratio"], 2))
-        c3.metric("EPS", f"{price_sym}{m['eps']:.2f}" if m["eps"] else "—")
+        c3.metric("EPS", f"{price_sym}{m['eps']:.2f}" if m["eps"] is not None else "—")
 
     with tab_prof:
         c1, c2, c3 = st.columns(3)
@@ -148,7 +148,7 @@ def render_stock_detail(symbol: str, market: str):
         c3.metric("配当利回り", fmt_num(m["dividend_yield"], 2, "%"))
         c1.metric("配当性向", fmt_num(m["payout_ratio"], 1, "%"))
         c2.metric("目標株価",
-                  f"{price_sym}{m['target_price']:.0f}" if m["target_price"] else "—")
+                  f"{price_sym}{m['target_price']:.0f}" if m["target_price"] is not None else "—")
         c3.metric("推奨", m.get("recommendation") or "—")
 
     if m.get("description"):
