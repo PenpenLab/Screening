@@ -240,7 +240,7 @@ def build_metrics(symbol: str, market: str, info: dict) -> dict:
         "equity_ratio": equity_ratio,
         "debt_to_equity": _safe_float(info.get("debtToEquity")),
         "current_ratio": _safe_float(info.get("currentRatio")),
-        "dividend_yield": pct("dividendYield"),
+        "dividend_yield": _safe_float(info.get("dividendYield")),
         "payout_ratio": pct("payoutRatio"),
         "eps": _safe_float(info.get("trailingEps")),
         "bps": _safe_float(info.get("bookValue")),
