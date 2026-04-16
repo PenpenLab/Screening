@@ -6,25 +6,12 @@ from __future__ import annotations
 
 from typing import Optional
 import pandas as pd
-import requests
 import yfinance as yf
 import streamlit as st
 from cachetools import TTLCache
 
 _info_cache: TTLCache = TTLCache(maxsize=500, ttl=900)
 _hist_cache: TTLCache = TTLCache(maxsize=200, ttl=900)
-
-# Custom requests session with browser-like headers to reduce Yahoo Finance rate limiting
-_session = requests.Session()
-_session.headers.update({
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/120.0.0.0 Safari/537.36"
-    ),
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "Accept-Language": "en-US,en;q=0.5",
-})
 
 
 # ── ヘルパー ──────────────────────────────────────────────────────────────
@@ -60,7 +47,7 @@ def fetch_info(symbol: str, market: str) -> dict:
     if key in _info_cache:
         return _info_cache[key]
     yf_symbol = _to_jp_symbol(symbol) if market == "JP" else symbol
-    ticker = yf.Ticker(yf_symbol, session=_session)
+    ticker = yf.Ticker(yf_symbol)
     info = ticker.info
     # 空dictや不正なレスポンスを弾く
     if not info or not isinstance(info, dict) or len(info) < 3:
@@ -72,7 +59,7 @@ def fetch_info(symbol: str, market: str) -> dict:
 @st.cache_data(ttl=900, show_spinner=False)
 def fetch_history(symbol: str, market: str, period: str = "1y") -> pd.DataFrame:
     yf_symbol = _to_jp_symbol(symbol) if market == "JP" else symbol
-    ticker = yf.Ticker(yf_symbol, session=_session)
+    ticker = yf.Ticker(yf_symbol)
     return ticker.history(period=period)
 
 
