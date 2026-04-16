@@ -3,6 +3,7 @@
 """
 from __future__ import annotations
 
+import time
 from typing import Optional
 import pandas as pd
 import streamlit as st
@@ -102,14 +103,23 @@ def screen_stocks(
     for i, symbol in enumerate(universe):
         if progress_bar is not None:
             progress_bar.progress((i + 1) / total, text=f"{symbol} を取得中... ({i+1}/{total})")
-        try:
-            info = fetch_info(symbol, market)
-            m = build_metrics(symbol, market, info)
-            if _passes(m, filters):
-                results.append(m)
-        except Exception as e:
-            errors.append(f"{symbol}: {e}")
-            continue
+        for attempt in range(3):
+            try:
+                info = fetch_info(symbol, market)
+                m = build_metrics(symbol, market, info)
+                if _passes(m, filters):
+                    results.append(m)
+                break
+            except Exception as e:
+                err_str = str(e)
+                is_rate_limit = "Too Many Requests" in err_str or "rate limit" in err_str.lower()
+                if is_rate_limit and attempt < 2:
+                    time.sleep(3 * (2 ** attempt))  # 3s, 6s
+                    continue
+                errors.append(f"{symbol}: {e}")
+                break
+        # Polite delay between tickers to avoid Yahoo Finance rate limits
+        time.sleep(0.5)
 
     if not results:
         return pd.DataFrame(), errors
