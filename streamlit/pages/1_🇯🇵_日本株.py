@@ -1,6 +1,12 @@
 """
 日本株スクリーニングページ
 """
+import sys
+import os
+# Streamlit Cloud はリポジトリルートを作業ディレクトリにするため
+# streamlit/ ディレクトリを明示的にパスに追加する
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import streamlit as st
 import pandas as pd
 
