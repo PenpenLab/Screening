@@ -74,6 +74,8 @@ def render_price_chart(symbol: str, market: str, currency: str):
 
     is_up = hist["Close"].iloc[-1] >= hist["Close"].iloc[0]
     color = "#22c55e" if is_up else "#ef4444"
+    fill_rgb = "34,197,94" if is_up else "239,68,68"
+    fill_color = f"rgba({fill_rgb},0.15)"
 
     fig = go.Figure()
     fig.add_trace(go.Scatter(
@@ -81,7 +83,7 @@ def render_price_chart(symbol: str, market: str, currency: str):
         mode="lines",
         fill="tozeroy",
         line=dict(color=color, width=2),
-        fillcolor=f"rgba({','.join(str(int(c * 255)) for c in (34/255, 197/255, 94/255) if is_up else (239/255, 68/255, 68/255))},0.15)",
+        fillcolor=fill_color,
         name="終値",
     ))
 
