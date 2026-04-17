@@ -4,6 +4,7 @@ cachetools.TTLCache でキャッシュ (TTL 15分)
 """
 from __future__ import annotations
 
+import time
 from typing import Optional
 import pandas as pd
 import yfinance as yf
@@ -12,6 +13,23 @@ from cachetools import TTLCache
 
 _info_cache: TTLCache = TTLCache(maxsize=500, ttl=900)
 _hist_cache: TTLCache = TTLCache(maxsize=200, ttl=900)
+
+
+def _retry_on_rate_limit(fn, retries: int = 5):
+    """レートリミットエラー時に指数バックオフでリトライする汎用ラッパー。"""
+    last_exc: Exception = RuntimeError("fetch failed")
+    for attempt in range(retries):
+        try:
+            return fn()
+        except Exception as e:
+            last_exc = e
+            err_str = str(e)
+            if "Too Many Requests" in err_str or "rate limit" in err_str.lower() or "429" in err_str:
+                wait = 2 ** attempt  # 1, 2, 4, 8, 16 秒
+                time.sleep(wait)
+                continue
+            raise
+    raise last_exc
 
 
 # ── ヘルパー ──────────────────────────────────────────────────────────────
@@ -43,35 +61,26 @@ def _safe_int(val) -> Optional[int]:
 # ── データ取得 ─────────────────────────────────────────────────────────────
 
 def fetch_info(symbol: str, market: str) -> dict:
-    import time
     key = f"{market}:{symbol}"
     if key in _info_cache:
         return _info_cache[key]
     yf_symbol = _to_jp_symbol(symbol) if market == "JP" else symbol
-    last_exc: Exception = RuntimeError("fetch failed")
-    for attempt in range(4):
-        try:
-            ticker = yf.Ticker(yf_symbol)
-            info = ticker.info
-            if not info or not isinstance(info, dict) or len(info) < 3:
-                raise ValueError(f"yfinance から有効なデータを取得できませんでした: {yf_symbol}")
-            _info_cache[key] = info
-            return info
-        except Exception as e:
-            last_exc = e
-            err_str = str(e)
-            if "Too Many Requests" in err_str or "rate limit" in err_str.lower():
-                time.sleep(2 ** attempt)  # 1s, 2s, 4s, 8s
-                continue
-            raise
-    raise last_exc
+
+    def _fetch():
+        info = yf.Ticker(yf_symbol).info
+        if not info or not isinstance(info, dict) or len(info) < 3:
+            raise ValueError(f"yfinance から有効なデータを取得できませんでした: {yf_symbol}")
+        return info
+
+    info = _retry_on_rate_limit(_fetch)
+    _info_cache[key] = info
+    return info
 
 
 @st.cache_data(ttl=900, show_spinner=False)
 def fetch_history(symbol: str, market: str, period: str = "1y") -> pd.DataFrame:
     yf_symbol = _to_jp_symbol(symbol) if market == "JP" else symbol
-    ticker = yf.Ticker(yf_symbol)
-    return ticker.history(period=period)
+    return _retry_on_rate_limit(lambda: yf.Ticker(yf_symbol).history(period=period))
 
 
 @st.cache_data(ttl=900, show_spinner=False)
@@ -284,7 +293,6 @@ def get_stock_metrics(symbol: str, market: str) -> dict:
 @st.cache_data(ttl=900, show_spinner=False)
 def fetch_financials(symbol: str, market: str) -> dict:
     yf_symbol = _to_jp_symbol(symbol) if market == "JP" else symbol
-    ticker = yf.Ticker(yf_symbol)
     out: dict = {}
     for key, attrs in [
         ("income", ["income_stmt", "financials"]),
@@ -292,7 +300,7 @@ def fetch_financials(symbol: str, market: str) -> dict:
     ]:
         for attr in attrs:
             try:
-                df = getattr(ticker, attr)
+                df = _retry_on_rate_limit(lambda a=attr: getattr(yf.Ticker(yf_symbol), a))
                 if df is not None and not df.empty:
                     out[key] = df
                     break
@@ -307,8 +315,9 @@ def fetch_financials(symbol: str, market: str) -> dict:
 def fetch_holders(symbol: str, market: str) -> pd.DataFrame:
     yf_symbol = _to_jp_symbol(symbol) if market == "JP" else symbol
     try:
-        df = yf.Ticker(yf_symbol).institutional_holders
-        return df if df is not None else pd.DataFrame()
+        return _retry_on_rate_limit(
+            lambda: yf.Ticker(yf_symbol).institutional_holders or pd.DataFrame()
+        )
     except Exception:
         return pd.DataFrame()
 
