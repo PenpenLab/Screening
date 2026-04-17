@@ -66,7 +66,7 @@ def fetch_history(symbol: str, market: str, period: str = "1y") -> pd.DataFrame:
 @st.cache_data(ttl=900, show_spinner=False)
 def search_stocks(query: str, market: str) -> list[dict]:
     try:
-        results = yf.Search(query, max_results=10)
+        results = yf.Search(query, max_results=15)
         filtered = []
         for q in results.quotes:
             sym = q.get("symbol", "")
@@ -74,12 +74,17 @@ def search_stocks(query: str, market: str) -> list[dict]:
             q_type = q.get("quoteType", "")
             if q_type not in ("EQUITY", "ETF"):
                 continue
-            if market == "JP" and not (sym.endswith(".T") or exchange in ("TKS", "OSA")):
-                continue
-            if market == "US" and "." in sym:
-                continue
+            if market == "JP":
+                # .T サフィックスか日本の主要取引所コードを許容
+                jp_exchanges = {"TKS", "OSA", "FKS", "NGO", "SAP", "JPX", "JPN", "TSE"}
+                if not (sym.endswith(".T") or sym.endswith(".OS") or exchange in jp_exchanges):
+                    continue
+            elif market == "US":
+                if "." in sym:
+                    continue
+            clean_sym = sym.replace(".T", "").replace(".OS", "") if market == "JP" else sym
             filtered.append({
-                "symbol": sym.replace(".T", "") if market == "JP" else sym,
+                "symbol": clean_sym,
                 "name": q.get("longname") or q.get("shortname", sym),
                 "exchange": exchange,
             })
