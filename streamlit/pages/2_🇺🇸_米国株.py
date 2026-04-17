@@ -70,7 +70,7 @@ if run_btn:
     if op_margin_min > 0: filters["operating_margin_min"] = op_margin_min
     if de_max > 0: filters["debt_to_equity_max"] = de_max
     if rev_growth_min != 0: filters["revenue_growth_min"] = rev_growth_min
-    if eps_growth_min != 0: filters["earnings_growth_min"] = eps_growth_min
+    if eps_growth_min != 0: filters["eps_growth_min"] = eps_growth_min
     if div_yield_min > 0: filters["dividend_yield_min"] = div_yield_min
     if cap_min > 0: filters["market_cap_min"] = cap_min
     if cap_max > 0: filters["market_cap_max"] = cap_max

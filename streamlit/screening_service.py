@@ -60,7 +60,7 @@ def _passes(m: dict, filters: dict) -> bool:
         check_min("roa", filters.get("roa_min")),
         check_min("operating_margin", filters.get("operating_margin_min")),
         check_min("revenue_growth", filters.get("revenue_growth_min")),
-        check_min("earnings_growth", filters.get("earnings_growth_min")),
+        check_min("eps_growth", filters.get("eps_growth_min")),
         check_min("dividend_yield", filters.get("dividend_yield_min")),
         check_min("equity_ratio", filters.get("equity_ratio_min")),
         check_max("debt_to_equity", filters.get("debt_to_equity_max")),
