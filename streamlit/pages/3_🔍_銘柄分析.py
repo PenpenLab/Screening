@@ -22,7 +22,7 @@ st.caption("ティッカーまたは銘柄名で検索 → 業績・テクニカ
 # ── 検索フォーム ──────────────────────────────────────────────────────────
 col_mkt, col_q = st.columns([1, 3])
 with col_mkt:
-    market = st.radio("市場", ["JP", "US"], horizontal=True, key="anal_market")
+    market = st.radio("市場", ["JP", "US"], horizontal=True, key="anal_market_radio")
 with col_q:
     query = st.text_input(
         "銘柄名 or ティッカー",
@@ -43,9 +43,9 @@ if query:
 
     if st.button("🔍 分析開始", type="primary", use_container_width=False):
         st.session_state["anal_symbol"] = symbol
-        st.session_state["anal_market"] = market
+        st.session_state["anal_market_val"] = market
         # データをクリアして再取得
-        for k in ["anal_m", "anal_hist", "anal_fin", "anal_holders"]:
+        for k in ["anal_m", "anal_info", "anal_hist", "anal_fin", "anal_holders", "anal_ai_result"]:
             st.session_state.pop(k, None)
 
 # ── 分析表示 ──────────────────────────────────────────────────────────────
@@ -54,7 +54,7 @@ if "anal_symbol" not in st.session_state:
     st.stop()
 
 sym = st.session_state["anal_symbol"]
-mkt = st.session_state["anal_market"]
+mkt = st.session_state["anal_market_val"]
 
 # データ取得（セッションキャッシュ）
 if "anal_m" not in st.session_state:
