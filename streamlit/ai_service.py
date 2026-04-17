@@ -109,3 +109,35 @@ def analyze_stock(symbol: str, market: str, metrics_json: str) -> dict:
         raw = raw.split("```")[1].split("```")[0].strip()
 
     return json.loads(raw)
+
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def analyze_stock_full(symbol: str, market: str, metrics_json: str, technical_summary: str) -> dict:
+    """テクニカルシグナルを含む総合分析（銘柄分析ページ用）"""
+    api_key = st.secrets.get("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        raise ValueError("ANTHROPIC_API_KEY が設定されていません")
+
+    metrics = json.loads(metrics_json)
+    client = Anthropic(api_key=api_key)
+    metrics_text = _format_metrics(metrics)
+    user_message = (
+        f"以下の財務データとテクニカル分析をもとに総合分析してください。\n\n"
+        f"{metrics_text}\n\n"
+        f"--- テクニカルシグナル ---\n{technical_summary}"
+    )
+
+    response = client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=1500,
+        system=[{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
+        messages=[{"role": "user", "content": user_message}],
+    )
+
+    raw = response.content[0].text.strip()
+    if "```json" in raw:
+        raw = raw.split("```json")[1].split("```")[0].strip()
+    elif "```" in raw:
+        raw = raw.split("```")[1].split("```")[0].strip()
+
+    return json.loads(raw)

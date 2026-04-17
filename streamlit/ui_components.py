@@ -7,6 +7,7 @@ import json
 import plotly.graph_objects as go
 import streamlit as st
 import pandas as pd
+import yfinance as yf
 
 from stock_service import fetch_info, fetch_history, build_metrics
 from ai_service import analyze_stock
@@ -256,3 +257,197 @@ def render_screening_table(df: pd.DataFrame, market: str) -> str | None:
     selected = st.selectbox("詳細を表示する銘柄を選択", ["— 選択してください —"] + symbols,
                             key=f"select_{market}")
     return selected if selected != "— 選択してください —" else None
+
+
+# ── 銘柄分析ページ用コンポーネント ────────────────────────────────────────
+
+def _dark_layout(fig, title: str = "", height: int = 250):
+    fig.update_layout(
+        title=title,
+        plot_bgcolor="#0f172a", paper_bgcolor="#0f172a",
+        font=dict(color="#94a3b8"),
+        height=height, margin=dict(l=0, r=0, t=30 if title else 10, b=0),
+        xaxis=dict(showgrid=False, color="#475569"),
+        yaxis=dict(gridcolor="#1e293b", color="#475569"),
+    )
+
+
+def render_fundamental_tab(m: dict, fin_data: dict):
+    currency = m["currency"]
+    unit = "億円" if currency == "JPY" else "B USD"
+    divisor = 1e8 if currency == "JPY" else 1e9
+
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("ROE", fmt_num(m["roe"], 1, "%"))
+    c2.metric("営業利益率", fmt_num(m["operating_margin"], 1, "%"))
+    c3.metric("配当利回り", fmt_num(m["dividend_yield"], 2, "%"))
+    c4.metric("PER", fmt_num(m["per"], 1, "x"))
+
+    income = fin_data.get("income", pd.DataFrame())
+    if income is None or income.empty:
+        st.info("財務諸表データを取得できませんでした。")
+        return
+
+    income = income.sort_index(axis=1)
+
+    if "Total Revenue" in income.index:
+        rev = income.loc["Total Revenue"].dropna() / divisor
+        if not rev.empty:
+            fig = go.Figure(go.Bar(
+                x=[str(d)[:7] for d in rev.index], y=rev.values,
+                marker_color="#3b82f6",
+                text=[f"{v:.0f}" for v in rev.values], textposition="outside",
+            ))
+            _dark_layout(fig, f"売上高推移 ({unit})", height=250)
+            st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+
+    col_a, col_b = st.columns(2)
+    for widget, row_key, label, color in [
+        (col_a, "Operating Income", f"営業利益 ({unit})", "#22c55e"),
+        (col_b, "Net Income", f"純利益 ({unit})", "#a855f7"),
+    ]:
+        if row_key in income.index:
+            series = income.loc[row_key].dropna() / divisor
+            if not series.empty:
+                bar_colors = ["#22c55e" if v >= 0 else "#ef4444" for v in series.values]
+                fig = go.Figure(go.Bar(
+                    x=[str(d)[:7] for d in series.index], y=series.values,
+                    marker_color=bar_colors,
+                ))
+                _dark_layout(fig, label, height=220)
+                widget.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+
+
+def render_technical_tab(indicators: dict, m: dict):
+    if not indicators:
+        st.warning("価格データを取得できませんでした。")
+        return
+
+    price_sym = "¥" if m["currency"] == "JPY" else "$"
+    signals = indicators.get("signals", [])
+    bullish = sum(1 for s in signals if s[2] == "bullish")
+    bearish = sum(1 for s in signals if s[2] == "bearish")
+
+    if bullish > bearish:
+        overall, border = "🟢 買い優勢", "#22c55e"
+    elif bearish > bullish:
+        overall, border = "🔴 売り優勢", "#ef4444"
+    else:
+        overall, border = "🟡 中立", "#f59e0b"
+
+    rows_html = "".join(
+        f"<div style='margin:4px 0'>{'🟢' if s[2]=='bullish' else '🔴' if s[2]=='bearish' else '🟡'} "
+        f"<b>{s[0]}</b> &mdash; {s[1]}</div>"
+        for s in signals
+    )
+    st.markdown(
+        f"""<div style="border:2px solid {border};border-radius:8px;padding:14px;margin-bottom:12px">
+<span style="font-size:1.15em;font-weight:bold">{overall}</span>
+&nbsp;&nbsp;<span style="color:#94a3b8;font-size:.9em">買い {bullish} / 売り {bearish} / 計 {len(signals)} シグナル</span>
+<hr style="border-color:#1e293b;margin:8px 0">
+{rows_html}
+</div>""",
+        unsafe_allow_html=True,
+    )
+
+    close = indicators["close"]
+    ma20, ma50, ma200 = indicators["ma20"], indicators["ma50"], indicators["ma200"]
+    rsi = indicators["rsi"]
+    macd_line = indicators["macd_line"]
+    signal_line = indicators["signal_line"]
+    histogram = indicators["histogram"]
+    latest_rsi = indicators.get("latest_rsi")
+
+    is_up = float(close.iloc[-1]) >= float(close.iloc[0])
+    price_color = "#22c55e" if is_up else "#ef4444"
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=close.index, y=close, mode="lines",
+                             line=dict(color=price_color, width=2), name="株価"))
+    fig.add_trace(go.Scatter(x=ma20.index, y=ma20, mode="lines",
+                             line=dict(color="#60a5fa", width=1, dash="dot"), name="MA20"))
+    fig.add_trace(go.Scatter(x=ma50.index, y=ma50, mode="lines",
+                             line=dict(color="#f59e0b", width=1, dash="dot"), name="MA50"))
+    fig.add_trace(go.Scatter(x=ma200.index, y=ma200, mode="lines",
+                             line=dict(color="#a78bfa", width=1.5), name="MA200"))
+    _dark_layout(fig, height=300)
+    fig.update_layout(
+        yaxis=dict(tickprefix=price_sym, gridcolor="#1e293b"),
+        legend=dict(orientation="h", y=1.05, bgcolor="rgba(0,0,0,0)"),
+        hovermode="x unified",
+    )
+    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+
+    col_rsi, col_macd = st.columns(2)
+    with col_rsi:
+        rsi_color = ("#ef4444" if latest_rsi and latest_rsi > 70
+                     else "#22c55e" if latest_rsi and latest_rsi < 30 else "#60a5fa")
+        fig_r = go.Figure()
+        fig_r.add_trace(go.Scatter(x=rsi.index, y=rsi, mode="lines",
+                                   line=dict(color=rsi_color, width=2), name="RSI"))
+        fig_r.add_hline(y=70, line_color="#ef4444", line_dash="dash", line_width=1,
+                        annotation_text="買われすぎ 70", annotation_font_color="#ef4444")
+        fig_r.add_hline(y=30, line_color="#22c55e", line_dash="dash", line_width=1,
+                        annotation_text="売られすぎ 30", annotation_font_color="#22c55e")
+        fig_r.add_hrect(y0=70, y1=100, fillcolor="rgba(239,68,68,0.08)", line_width=0)
+        fig_r.add_hrect(y0=0, y1=30, fillcolor="rgba(34,197,94,0.08)", line_width=0)
+        _dark_layout(fig_r, f"RSI(14) 現在: {latest_rsi:.1f}" if latest_rsi else "RSI(14)", height=230)
+        fig_r.update_layout(yaxis=dict(range=[0, 100], gridcolor="#1e293b"))
+        st.plotly_chart(fig_r, use_container_width=True, config={"displayModeBar": False})
+
+    with col_macd:
+        hist_colors = ["#22c55e" if v >= 0 else "#ef4444" for v in histogram.values]
+        fig_m = go.Figure()
+        fig_m.add_trace(go.Bar(x=histogram.index, y=histogram.values,
+                               marker_color=hist_colors, name="ヒスト", opacity=0.6))
+        fig_m.add_trace(go.Scatter(x=macd_line.index, y=macd_line, mode="lines",
+                                   line=dict(color="#60a5fa", width=1.5), name="MACD"))
+        fig_m.add_trace(go.Scatter(x=signal_line.index, y=signal_line, mode="lines",
+                                   line=dict(color="#f97316", width=1.5), name="Signal"))
+        _dark_layout(fig_m, "MACD(12,26,9)", height=230)
+        fig_m.update_layout(
+            legend=dict(orientation="h", y=1.1, bgcolor="rgba(0,0,0,0)", font=dict(size=10))
+        )
+        st.plotly_chart(fig_m, use_container_width=True, config={"displayModeBar": False})
+
+
+def render_market_tab(m: dict, info: dict, holders: pd.DataFrame):
+    col_short, col_macro = st.columns(2)
+
+    with col_short:
+        st.subheader("需給データ")
+        try:
+            sp = float(info["shortPercentOfFloat"]) * 100 if info.get("shortPercentOfFloat") is not None else None
+        except Exception:
+            sp = None
+        try:
+            sr = float(info["shortRatio"]) if info.get("shortRatio") is not None else None
+        except Exception:
+            sr = None
+        s1, s2 = st.columns(2)
+        s1.metric("空売り比率", f"{sp:.1f}%" if sp is not None else "—",
+                  help="流通株に対する空売り残高の割合（Short Float）")
+        s2.metric("Days to Cover", f"{sr:.1f}日" if sr is not None else "—",
+                  help="空売り残高を出来高で割った解消所要日数")
+        if m.get("market") == "JP":
+            st.caption("📌 信用買い残・売り残は別途APIが必要なため現在未対応です。")
+
+    with col_macro:
+        st.subheader("マクロ指標（現在値）")
+        for label, sym in [
+            ("米10年債利回り", "^TNX"),
+            ("USD/JPY", "USDJPY=X"),
+            ("VIX（恐怖指数）", "^VIX"),
+        ]:
+            try:
+                price = yf.Ticker(sym).info.get("regularMarketPrice")
+                st.metric(label, f"{float(price):.2f}" if price else "—")
+            except Exception:
+                st.metric(label, "—")
+
+    st.markdown("---")
+    st.subheader("🏛 機関投資家 保有上位")
+    if holders is not None and not holders.empty:
+        disp = [c for c in ["Holder", "Shares", "% Out", "Value"] if c in holders.columns]
+        st.dataframe(holders[disp].head(10), use_container_width=True, hide_index=True)
+    else:
+        st.info("機関投資家データを取得できませんでした（日本株は対応外の場合があります）。")

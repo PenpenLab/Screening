@@ -261,3 +261,119 @@ def build_metrics(symbol: str, market: str, info: dict) -> dict:
 def get_stock_metrics(symbol: str, market: str) -> dict:
     info = fetch_info(symbol, market)
     return build_metrics(symbol, market, info)
+
+
+# ── 財務諸表・株主データ ────────────────────────────────────────────────────
+
+@st.cache_data(ttl=900, show_spinner=False)
+def fetch_financials(symbol: str, market: str) -> dict:
+    yf_symbol = _to_jp_symbol(symbol) if market == "JP" else symbol
+    ticker = yf.Ticker(yf_symbol)
+    out: dict = {}
+    for key, attrs in [
+        ("income", ["income_stmt", "financials"]),
+        ("quarterly_income", ["quarterly_income_stmt", "quarterly_financials"]),
+    ]:
+        for attr in attrs:
+            try:
+                df = getattr(ticker, attr)
+                if df is not None and not df.empty:
+                    out[key] = df
+                    break
+            except Exception:
+                continue
+        if key not in out:
+            out[key] = pd.DataFrame()
+    return out
+
+
+@st.cache_data(ttl=900, show_spinner=False)
+def fetch_holders(symbol: str, market: str) -> pd.DataFrame:
+    yf_symbol = _to_jp_symbol(symbol) if market == "JP" else symbol
+    try:
+        df = yf.Ticker(yf_symbol).institutional_holders
+        return df if df is not None else pd.DataFrame()
+    except Exception:
+        return pd.DataFrame()
+
+
+# ── テクニカル指標計算 ─────────────────────────────────────────────────────
+
+def calc_technical_indicators(hist: pd.DataFrame) -> dict:
+    """RSI・MACD・移動平均と売買シグナルを算出して返す"""
+    if hist is None or hist.empty:
+        return {}
+    close = hist["Close"]
+
+    ma20 = close.rolling(20).mean()
+    ma50 = close.rolling(50).mean()
+    ma200 = close.rolling(200).mean()
+
+    # RSI (14期間, Wilderスムージング)
+    delta = close.diff()
+    avg_gain = delta.clip(lower=0).ewm(alpha=1 / 14, min_periods=14, adjust=False).mean()
+    avg_loss = (-delta.clip(upper=0)).ewm(alpha=1 / 14, min_periods=14, adjust=False).mean()
+    rs = avg_gain / avg_loss.replace(0, float("nan"))
+    rsi = 100 - (100 / (1 + rs))
+
+    # MACD (12, 26, 9)
+    ema12 = close.ewm(span=12, adjust=False).mean()
+    ema26 = close.ewm(span=26, adjust=False).mean()
+    macd_line = ema12 - ema26
+    signal_line = macd_line.ewm(span=9, adjust=False).mean()
+    histogram = macd_line - signal_line
+
+    # シグナル検出
+    signals: list[tuple[str, str, str]] = []
+    latest_rsi = float(rsi.iloc[-1]) if not pd.isna(rsi.iloc[-1]) else None
+
+    if latest_rsi is not None:
+        if latest_rsi < 30:
+            signals.append(("買い", f"RSI {latest_rsi:.1f} — 売られすぎゾーン（30未満）", "bullish"))
+        elif latest_rsi > 70:
+            signals.append(("売り", f"RSI {latest_rsi:.1f} — 買われすぎゾーン（70超）", "bearish"))
+        else:
+            signals.append(("中立", f"RSI {latest_rsi:.1f} — 中立ゾーン（30〜70）", "neutral"))
+
+    if len(macd_line) >= 2 and not pd.isna(macd_line.iloc[-1]):
+        prev = float(macd_line.iloc[-2]) - float(signal_line.iloc[-2])
+        curr = float(macd_line.iloc[-1]) - float(signal_line.iloc[-1])
+        if prev < 0 <= curr:
+            signals.append(("買い", "MACD がシグナル線を上抜け（ゴールデンクロス）", "bullish"))
+        elif prev > 0 >= curr:
+            signals.append(("売り", "MACD がシグナル線を下抜け（デッドクロス）", "bearish"))
+        elif curr > 0:
+            signals.append(("中立（強気）", "MACD > シグナル線（上昇モメンタム継続）", "bullish"))
+        else:
+            signals.append(("中立（弱気）", "MACD < シグナル線（下降モメンタム継続）", "bearish"))
+
+    if not pd.isna(ma20.iloc[-1]) and not pd.isna(ma50.iloc[-1]) \
+            and not pd.isna(ma20.iloc[-2]) and not pd.isna(ma50.iloc[-2]):
+        prev = float(ma20.iloc[-2]) - float(ma50.iloc[-2])
+        curr = float(ma20.iloc[-1]) - float(ma50.iloc[-1])
+        if prev < 0 <= curr:
+            signals.append(("買い", "MA20 が MA50 を上抜け（ゴールデンクロス）", "bullish"))
+        elif prev > 0 >= curr:
+            signals.append(("売り", "MA20 が MA50 を下抜け（デッドクロス）", "bearish"))
+        elif curr > 0:
+            signals.append(("中立（強気）", "MA20 > MA50（短期上昇トレンド）", "bullish"))
+        else:
+            signals.append(("中立（弱気）", "MA20 < MA50（短期下降トレンド）", "bearish"))
+
+    latest_price = float(close.iloc[-1])
+    latest_ma200 = float(ma200.iloc[-1]) if not pd.isna(ma200.iloc[-1]) else None
+    if latest_ma200 is not None:
+        pct_diff = (latest_price - latest_ma200) / latest_ma200 * 100
+        label = "強気トレンド" if latest_price > latest_ma200 else "弱気トレンド"
+        trend = "bullish" if latest_price > latest_ma200 else "bearish"
+        signals.append((label, f"株価が MA200 の {pct_diff:+.1f}% {'上' if trend=='bullish' else '下'}（長期{'上昇' if trend=='bullish' else '下降'}トレンド）", trend))
+
+    return {
+        "close": close,
+        "volume": hist["Volume"],
+        "ma20": ma20, "ma50": ma50, "ma200": ma200,
+        "rsi": rsi,
+        "macd_line": macd_line, "signal_line": signal_line, "histogram": histogram,
+        "signals": signals,
+        "latest_rsi": latest_rsi,
+    }
