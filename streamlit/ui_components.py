@@ -199,6 +199,35 @@ def _render_ai_result(result: dict):
         for r in result.get("risks", []):
             st.markdown(f"- {r}")
 
+    timing = result.get("timing")
+    if timing:
+        st.markdown("---")
+        st.markdown("**⏱ 売買タイミング**")
+        action_style = {
+            "買い":   ("🟢", "#166534", "#dcfce7"),
+            "売り":   ("🔴", "#991b1b", "#fee2e2"),
+            "様子見": ("🟡", "#854d0e", "#fef9c3"),
+        }
+        periods = [
+            ("短期", "short_term", "1〜4週間"),
+            ("中期", "mid_term",   "1〜6ヶ月"),
+            ("長期", "long_term",  "1年以上"),
+        ]
+        cols = st.columns(3)
+        for col, (label, key, horizon) in zip(cols, periods):
+            t = timing.get(key, {})
+            action = t.get("action", "様子見")
+            reason = t.get("reason", "")
+            icon, fg, bg = action_style.get(action, ("🟡", "#854d0e", "#fef9c3"))
+            col.markdown(
+                f"<div style='background:{bg};border-radius:8px;padding:12px;text-align:center'>"
+                f"<div style='font-size:0.75rem;color:#6b7280'>{label}（{horizon}）</div>"
+                f"<div style='font-size:1.3rem;font-weight:bold;color:{fg}'>{icon} {action}</div>"
+                f"<div style='font-size:0.8rem;margin-top:6px;color:#374151'>{reason}</div>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+
     st.caption(result.get("disclaimer", ""))
 
 
