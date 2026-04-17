@@ -14,7 +14,7 @@ from ui_components import (
     render_fundamental_tab, render_technical_tab, render_market_tab,
     _render_ai_result,
 )
-from ai_service import analyze_stock_full
+from ai_service import analyze_stock
 
 st.set_page_config(page_title="銘柄分析", page_icon="🔍", layout="wide")
 st.title("🔍 銘柄分析")
@@ -136,7 +136,7 @@ with tab4:
         if st.button("🤖 AI 総合分析を実行", type="primary", key="ai_full"):
             with st.spinner("Claude が分析中..."):
                 try:
-                    result = analyze_stock_full(sym, mkt, json.dumps(m), tech_summary)
+                    result = analyze_stock(sym, mkt, json.dumps(m), tech_summary)
                     st.session_state["anal_ai_result"] = result
                 except Exception as e:
                     st.error(f"AI分析に失敗しました: {e}")
