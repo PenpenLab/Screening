@@ -17,15 +17,17 @@ from ai_service import analyze_stock_full
 
 st.set_page_config(page_title="銘柄分析", page_icon="🔍", layout="wide")
 st.title("🔍 銘柄分析")
-st.caption("ティッカーまたは銘柄名で検索 → 業績・テクニカル・需給・AI総合分析")
+st.caption("銘柄コード・ティッカーで検索 → 業績・テクニカル・需給・AI総合分析")
 
 # ── サイドバー: 検索フォーム ──────────────────────────────────────────────
 with st.sidebar:
     st.header("🔍 銘柄検索")
     market = st.radio("市場", ["JP", "US"], horizontal=True, key="anal_market_radio")
+    label = "銘柄コード" if market == "JP" else "ティッカー"
+    placeholder = "例: 7203 / 9984" if market == "JP" else "例: AAPL / NVDA"
     query = st.text_input(
-        "銘柄名 or ティッカー",
-        placeholder="例: トヨタ / AAPL / 7203 / ソフトバンク",
+        label,
+        placeholder=placeholder,
         key="anal_query",
     )
 
