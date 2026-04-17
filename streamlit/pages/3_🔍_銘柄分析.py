@@ -1,12 +1,13 @@
 """
-銘柄分析ページ — ティッカー直接入力 → 4タブ分析
+銘柄分析ページ — 銘柄コード/ティッカー直接入力 → 4タブ分析
 """
 import json
+import re
 import streamlit as st
 
 from stock_service import (
     fetch_info, fetch_history, fetch_financials, fetch_holders,
-    build_metrics, calc_technical_indicators, search_stocks,
+    build_metrics, calc_technical_indicators,
 )
 from ui_components import (
     fmt_price, fmt_cap, delta_color,
@@ -17,50 +18,53 @@ from ai_service import analyze_stock_full
 
 st.set_page_config(page_title="銘柄分析", page_icon="🔍", layout="wide")
 st.title("🔍 銘柄分析")
-st.caption("銘柄コード・ティッカーで検索 → 業績・テクニカル・需給・AI総合分析")
+st.caption("銘柄コード・ティッカーを入力 → 業績・テクニカル・需給・AI総合分析")
 
 # ── サイドバー: 検索フォーム ──────────────────────────────────────────────
 with st.sidebar:
-    st.header("🔍 銘柄検索")
+    st.header("🔍 銘柄入力")
     market = st.radio("市場", ["JP", "US"], horizontal=True, key="anal_market_radio")
-    label = "銘柄コード" if market == "JP" else "ティッカー"
-    placeholder = "例: 7203 / 9984" if market == "JP" else "例: AAPL / NVDA"
-    query = st.text_input(
-        label,
-        placeholder=placeholder,
-        key="anal_query",
-    )
+
+    if market == "JP":
+        label = "銘柄コード（4桁）"
+        placeholder = "例: 7203 / 9984"
+        help_text = "東証上場銘柄の4桁証券コードを入力してください。"
+    else:
+        label = "ティッカー"
+        placeholder = "例: AAPL / NVDA"
+        help_text = "NYSE/NASDAQ上場銘柄のティッカーシンボルを入力してください。"
+
+    query = st.text_input(label, placeholder=placeholder, help=help_text, key="anal_query")
 
     symbol: str | None = None
+    error_msg: str | None = None
 
     if query:
-        q = query.strip()
-
-        # JP市場で4桁数字なら直接コードとして扱う
-        if market == "JP" and q.isdigit() and len(q) == 4:
-            symbol = q
-            st.success(f"証券コード: **{symbol}**")
-        else:
-            results = search_stocks(q, market)
-            if results:
-                options = {f"{r['name']}  ({r['symbol']})": r["symbol"] for r in results}
-                chosen = st.selectbox("銘柄を選択", list(options.keys()), key="anal_select")
-                symbol = options[chosen]
+        q = query.strip().upper()
+        if market == "JP":
+            if re.fullmatch(r"\d{4}", q):
+                symbol = q
             else:
-                st.warning("検索結果が見つかりませんでした。\n\n日本株は4桁コード (例: 9984)、米国株はティッカー (例: AAPL) で入力してください。")
+                error_msg = "日本株は4桁の証券コードを入力してください（例: 7203）。"
+        else:
+            if re.fullmatch(r"[A-Z]{1,5}(-[A-Z])?", q):
+                symbol = q
+            else:
+                error_msg = "米国株はティッカーシンボルを入力してください（例: AAPL）。"
+
+    if error_msg:
+        st.warning(error_msg)
 
     if symbol:
-        st.markdown(f"選択中: **{symbol}** ({market})")
         if st.button("🔍 分析開始", type="primary", use_container_width=True):
             st.session_state["anal_symbol"] = symbol
             st.session_state["anal_market_val"] = market
-            # データをクリアして再取得
             for k in ["anal_m", "anal_info", "anal_hist", "anal_fin", "anal_holders", "anal_ai_result"]:
                 st.session_state.pop(k, None)
 
 # ── 分析表示 ──────────────────────────────────────────────────────────────
 if "anal_symbol" not in st.session_state:
-    st.info("👈 左のサイドバーで市場を選択し、銘柄名またはティッカーを入力して「分析開始」を押してください。")
+    st.info("👈 左のサイドバーで市場を選択し、銘柄コード（JP）またはティッカー（US）を入力して「分析開始」を押してください。")
     st.stop()
 
 sym = st.session_state["anal_symbol"]
