@@ -43,17 +43,28 @@ def _safe_int(val) -> Optional[int]:
 # ── データ取得 ─────────────────────────────────────────────────────────────
 
 def fetch_info(symbol: str, market: str) -> dict:
+    import time
     key = f"{market}:{symbol}"
     if key in _info_cache:
         return _info_cache[key]
     yf_symbol = _to_jp_symbol(symbol) if market == "JP" else symbol
-    ticker = yf.Ticker(yf_symbol)
-    info = ticker.info
-    # 空dictや不正なレスポンスを弾く
-    if not info or not isinstance(info, dict) or len(info) < 3:
-        raise ValueError(f"yfinance から有効なデータを取得できませんでした: {yf_symbol}")
-    _info_cache[key] = info
-    return info
+    last_exc: Exception = RuntimeError("fetch failed")
+    for attempt in range(4):
+        try:
+            ticker = yf.Ticker(yf_symbol)
+            info = ticker.info
+            if not info or not isinstance(info, dict) or len(info) < 3:
+                raise ValueError(f"yfinance から有効なデータを取得できませんでした: {yf_symbol}")
+            _info_cache[key] = info
+            return info
+        except Exception as e:
+            last_exc = e
+            err_str = str(e)
+            if "Too Many Requests" in err_str or "rate limit" in err_str.lower():
+                time.sleep(2 ** attempt)  # 1s, 2s, 4s, 8s
+                continue
+            raise
+    raise last_exc
 
 
 @st.cache_data(ttl=900, show_spinner=False)

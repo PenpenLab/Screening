@@ -55,12 +55,11 @@ with st.sidebar:
     if error_msg:
         st.warning(error_msg)
 
-    if symbol:
-        if st.button("🔍 分析開始", type="primary", use_container_width=True):
-            st.session_state["anal_symbol"] = symbol
-            st.session_state["anal_market_val"] = market
-            for k in ["anal_m", "anal_info", "anal_hist", "anal_fin", "anal_holders", "anal_ai_result"]:
-                st.session_state.pop(k, None)
+    if st.button("🔍 分析開始", type="primary", use_container_width=True, disabled=not bool(symbol)):
+        st.session_state["anal_symbol"] = symbol
+        st.session_state["anal_market_val"] = market
+        for k in ["anal_m", "anal_info", "anal_hist", "anal_fin", "anal_holders", "anal_ai_result"]:
+            st.session_state.pop(k, None)
 
 # ── 分析表示 ──────────────────────────────────────────────────────────────
 if "anal_symbol" not in st.session_state:
