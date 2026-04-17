@@ -23,12 +23,28 @@ JP_UNIVERSE = [
 ]
 
 US_UNIVERSE = [
-    "AAPL", "MSFT", "NVDA", "AMZN", "META", "GOOGL", "TSLA", "BRK-B",
-    "UNH", "LLY", "JPM", "XOM", "V", "MA", "PG", "HD", "AVGO", "CVX",
-    "MRK", "ABBV", "COST", "PEP", "ADBE", "KO", "WMT", "TMO", "MCD",
-    "CSCO", "ACN", "NFLX", "ABT", "DHR", "NEE", "TXN", "PM", "LIN",
-    "CRM", "ORCL", "AMD", "QCOM", "RTX", "AMGN", "HON", "IBM", "GE",
-    "CAT", "UPS", "SBUX", "NOW", "INTC",
+    # メガキャップ・テック
+    "AAPL", "MSFT", "NVDA", "AMZN", "META", "GOOGL", "GOOG", "TSLA",
+    # 金融
+    "BRK-B", "JPM", "V", "MA", "BAC", "WFC", "GS", "MS",
+    # ヘルスケア
+    "UNH", "LLY", "MRK", "ABBV", "JNJ", "ABT", "TMO", "DHR", "PFE", "AMGN",
+    # 生活必需品・消費
+    "PG", "KO", "PEP", "WMT", "COST", "MCD", "SBUX", "NKE",
+    # エネルギー
+    "XOM", "CVX",
+    # 素材・産業
+    "LIN", "CAT", "HON", "GE", "RTX", "UPS",
+    # テクノロジー（セミコン・ソフト）
+    "AVGO", "ADBE", "CRM", "ORCL", "AMD", "QCOM", "TXN", "CSCO", "IBM", "INTC", "NOW",
+    # 通信・メディア
+    "NFLX", "ACN",
+    # ヘルスケア・公益
+    "NEE", "PM", "HD",
+    # 成長株・新興テック
+    "PLTR", "SNOW", "CRWD", "NET", "DDOG", "MDB", "ZS", "PANW",
+    "UBER", "ABNB", "COIN", "HOOD", "RBLX", "SPOT",
+    "ARM", "SMCI", "MSTR",
 ]
 
 
