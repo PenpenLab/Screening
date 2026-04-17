@@ -9,7 +9,7 @@ import streamlit as st
 import pandas as pd
 import yfinance as yf
 
-from stock_service import fetch_info, fetch_history, build_metrics
+from stock_service import fetch_info, fetch_history, build_metrics, calc_technical_indicators
 from ai_service import analyze_stock
 
 
@@ -174,7 +174,14 @@ def render_stock_detail(symbol: str, market: str):
     if st.button("AI 分析を実行", key=f"ai_{symbol}", type="primary"):
         with st.spinner("Claude が分析中..."):
             try:
-                result = analyze_stock(symbol, market, json.dumps(m))
+                hist = fetch_history(symbol, market, "1y")
+                indicators = calc_technical_indicators(hist)
+                signals = indicators.get("signals", [])
+                tech_summary = "\n".join(
+                    f"{'買い' if s[2]=='bullish' else '売り' if s[2]=='bearish' else '中立'}: {s[1]}"
+                    for s in signals
+                ) if signals else ""
+                result = analyze_stock(symbol, market, json.dumps(m), tech_summary)
                 _render_ai_result(result)
             except Exception as e:
                 st.error(f"AI分析に失敗しました: {e}")
